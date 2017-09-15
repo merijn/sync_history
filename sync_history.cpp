@@ -1,5 +1,8 @@
 #include <pwd.h>
 #include <signal.h>
+#ifdef __linux__
+#include <linux/limits.h>
+#endif
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/wait.h>
