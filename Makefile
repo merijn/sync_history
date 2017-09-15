@@ -20,10 +20,9 @@ CXXFLAGS=-O3 -MMD -MP -std=c++14 -g \
 LDFLAGS=-ldl -g
 LD=$(CXX)
 
-../../dotfiles/bin/sync_history: sync_history.o
+sync_history: sync_history.o
 	$(PRINTF) " LD\t$@\n"
 	$(AT)$(LD) $(LDFLAGS) $^ -o $@
-	$(AT)$@ shutdown
 
 %.o: %.cpp
 	$(PRINTF) " CXX\t$*.cpp\n"
