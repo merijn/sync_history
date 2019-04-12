@@ -12,10 +12,14 @@ else
 endif
 
 CXX?=clang++
-CXXFLAGS=-O3 -MMD -MP -std=c++14 -g \
-         -Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic \
-         -Wno-documentation-deprecated-sync -Wno-documentation -Wno-padded \
-         -Wno-unused-const-variable -Wno-reserved-id-macro -Wno-c99-extensions
+CXXFLAGS=-O3 -MMD -MP -std=c++14 -g -Wno-documentation-deprecated-sync \
+         -Wno-documentation -Wno-padded -Wno-unused-const-variable \
+         -Wno-reserved-id-macro -Wno-c99-extensions
+
+
+ifeq ($(CXX), clang++)
+    CXXFLAGS+=-Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic
+endif
 
 LDFLAGS=-ldl -g
 LD=$(CXX)
