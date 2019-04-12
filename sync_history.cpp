@@ -390,7 +390,10 @@ server(UnixSocket sock, ofstream&& history)
     Reply rep;
     Request *req = reinterpret_cast<Request*>(messageBuffer);
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     result = daemon(0, 0);
+#pragma clang diagnostic pop
     if (result == -1) throw ErrnoFatal("daemon");
 
     struct sigaction handler;
