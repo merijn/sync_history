@@ -204,7 +204,8 @@ class UnixSocket {
     struct sockaddr_un origin;
     struct sockaddr_un from;
 
-    static sockaddr_un addr_from_path(const string& path)
+    static sockaddr_un
+    addr_from_path(const string& path)
     {
         size_t ret;
         struct sockaddr_un addr;
@@ -470,7 +471,8 @@ server(UnixSocket sock, ofstream&& history)
 
 static void
 launchServer
-(int argc, char *argv[], UnixSocket& sock, const string& sockPath, string path)
+( int argc, char *argv[], UnixSocket& sock, const string& sockPath
+, const string& historyPath)
 {
     int ret = fork();
     if (ret == -1) throw ErrnoFatal("fork");
@@ -478,10 +480,9 @@ launchServer
         /* Child process */
         sock.close();
 
-        path += "/.bash_history";
         try {
             setProcName(argc, argv, "sync-historyd");
-            server(UnixSocket(sockPath), ofstream(path, ios_base::app));
+            server(UnixSocket(sockPath), ofstream(historyPath, ios_base::app));
         } catch (const ErrnoFatal& exc) {
             if (exc.error == EADDRINUSE && exc.func == "bind") {
                 /* Either another server won the race, or left over socket. */
@@ -500,12 +501,12 @@ launchServer
 
 static int
 client
-( int argc, char *argv[], const string& path
+( int argc, char *argv[], const string& runtimePath, const string& historyPath
 , pid_t pid, Request::Command cmd, char* data)
 {
     ssize_t ret;
-    UnixSocket sock(path + "/.sync-" + to_string(pid));
-    string sockPath(path + "/.sync_history");
+    UnixSocket sock(runtimePath + "/.sync-" + to_string(pid));
+    string sockPath(runtimePath + "/.sync_history");
     Reply *rep = reinterpret_cast<Reply*>(messageBuffer);
     Request req { pid , cmd , data ? strlen(data) + 1 : 0};
 
@@ -514,7 +515,7 @@ client
     } catch (const ErrnoFatal& exc) {
         if (exc.error == ENOENT && exc.func == "sendmsg") {
             /* No server socket! */
-            launchServer(argc, argv, sock, sockPath, path);
+            launchServer(argc, argv, sock, sockPath, historyPath);
             /* Retry after launching server */
             sock.send(req, data, sockPath);
         } else {
@@ -569,8 +570,13 @@ int main(int argc, char **argv)
         passwdEnt = getpwuid(getuid());
         if (passwdEnt == nullptr) throw ErrnoFatal("getpwduid");
 
-        string path = string(passwdEnt->pw_dir);
-        return client(argc, argv, path, pid, cmd, data);
+        string runtimePath = string(passwdEnt->pw_dir);
+        string historyPath = runtimePath + "/.bash_history";
+
+        const char *runtimePathPtr = std::getenv("XDG_RUNTIME_DIR");
+        if (runtimePathPtr) runtimePath = runtimePathPtr;
+
+        return client(argc, argv, runtimePath, historyPath, pid, cmd, data);
     } catch (const FatalError& exc) {
         /* Program exit due to unexpected errors */
         cerr << exc.what() << endl;
