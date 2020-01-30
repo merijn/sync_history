@@ -1,0 +1,59 @@
+name: Coverity
+
+on:
+  push:
+  schedule:
+    - cron: "0 0 * * 1"
+
+jobs:
+  cov-build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+        include:
+          - os: ubuntu-latest
+            url_dir: linux64
+          - os: macos-latest
+            url_dir: macOSX
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Cache Coverity Build Tool
+        id: cache-cov
+        uses: actions/cache@v1
+        with:
+          path: coverity_tool
+          key: ${{ runner.os }}-cov
+
+      - name: Download Coverity Build Tool
+        if: steps.cache-cov.outputs.cache-hit != 'true'
+        run: |
+          wget https://scan.coverity.com/download/${{ matrix.url_dir }} --post-data "token=$TOKEN&project=merijn%2Fsync_history" -O coverity_tool.tgz
+          mkdir coverity_tool
+          tar xzf coverity_tool.tgz --strip 1 -C coverity_tool
+        env:
+          TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
+
+      - name: Build with cov-build
+        run: |
+          export PATH="`pwd`/coverity_tool/bin:$PATH"
+          cov-build --dir cov-int make
+          tar czvf sync_history.tgz cov-int
+        env:
+            COVERITY_UNSUPPORTED: 1
+
+      - name: Submit the result to Coverity Scan
+        run: |
+          tar czvf sync_history.tgz cov-int
+          curl \
+            --form token=$TOKEN \
+            --form email=merijn@inconsistent.nl \
+            --form file=@sync_history.tgz \
+            --form version="master-${{ runner.os }}" \
+            --form description="${{ runner.os }}" \
+            https://scan.coverity.com/builds?project=merijn%2Fsync_history
+        env:
+          TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
