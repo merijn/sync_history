@@ -214,7 +214,9 @@ class UnixSocket {
         if (ret >= sizeof addr.sun_path) {
             throw FatalError("Socket path to long");
         }
+#ifdef __APPLE__
         addr.sun_len = static_cast<unsigned char>(ret);
+#endif
         return addr;
     }
 
