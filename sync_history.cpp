@@ -214,6 +214,7 @@ class UnixSocket {
         if (ret >= sizeof addr.sun_path) {
             throw FatalError("Socket path to long");
         }
+        addr.sun_len = static_cast<unsigned char>(ret);
         return addr;
     }
 
