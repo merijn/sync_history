@@ -99,7 +99,7 @@ class FatalError : public runtime_error {
     FatalError(const FatalError& exc) : runtime_error(exc.what())
     {}
 
-    ~FatalError();
+    ~FatalError() override;
 };
 
 FatalError::~FatalError() {}
@@ -124,7 +124,7 @@ class ErrnoFatal : public FatalError {
      : FatalError(exc.what()), error(exc.error), func(exc.func)
     {}
 
-    ~ErrnoFatal();
+    ~ErrnoFatal() override;
 };
 
 ErrnoFatal::~ErrnoFatal() {}
@@ -163,7 +163,7 @@ struct membuf : public std::streambuf {
 
   protected:
     std::streamsize
-    xsputn(const char_type* s, std::streamsize count)
+    xsputn(const char_type* s, std::streamsize count) override
     {
         std::streamsize result = std::streambuf::xsputn(s, count);
         /* Always legal, because epptr points before in due to constructor */
@@ -171,11 +171,11 @@ struct membuf : public std::streambuf {
         return result;
     }
 
-    pos_type seekpos(pos_type pos, openmode which = ios_base::out)
+    pos_type seekpos(pos_type pos, openmode which = ios_base::out) override
     { return seekoff(pos, ios_base::beg, which); }
 
     pos_type
-    seekoff(off_type off, seekdir dir, openmode which = ios_base::out)
+    seekoff(off_type off, seekdir dir, openmode which = ios_base::out) override
     {
         if ((which & ios_base::out) != ios_base::out) {
             return pos_type(off_type(-1));
@@ -192,7 +192,7 @@ struct membuf : public std::streambuf {
         return pptr() - pbase();
     }
 
-    ~membuf();
+    ~membuf() override;
 };
 
 membuf::~membuf() {}
@@ -339,7 +339,7 @@ class HistCache : virtual membuf, public ostream {
 
   public:
     HistCache() : membuf(array), ostream(this), fresh(true) {}
-    ~HistCache();
+    ~HistCache() override;
 
     operator void*()
     { return array; }

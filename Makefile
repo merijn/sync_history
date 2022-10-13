@@ -17,7 +17,8 @@ CXXFLAGS=-O3 -MMD -MP -std=c++14 -g -Wno-documentation-deprecated-sync \
          -Wno-reserved-id-macro -Wno-c99-extensions
 
 ifeq ($(CXX), clang++)
-    CXXFLAGS+=-Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic
+    CXXFLAGS+=-Weverything -Wno-c++98-compat -Wno-c++98-compat-pedantic \
+        -Wno-poison-system-directories
 endif
 
 LDFLAGS=-ldl -g
