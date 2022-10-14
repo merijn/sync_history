@@ -557,6 +557,12 @@ int main(int argc, char **argv)
     struct passwd *passwdEnt;
 
     try {
+        passwdEnt = getpwuid(getuid());
+        if (passwdEnt == nullptr) throw ErrnoFatal("getpwduid");
+
+        string homeDirPath = string(passwdEnt->pw_dir);
+        string historyPath = homeDirPath + "/.bash_history_synced";
+
         if ((argc == 3 || argc == 4) && !strcmp(argv[1], "update")) {
             cmd = Request::Command::update;
             pid = stoi(argv[2]);
@@ -566,18 +572,18 @@ int main(int argc, char **argv)
             pid = stoi(argv[2]);
         } else if (argc == 2 && !strcmp(argv[1], "shutdown")) {
             cmd = Request::Command::shutdown;
+        } else if (argc == 2 && !strcmp(argv[1], "history-path")) {
+            cout << historyPath << endl;
+            exit(EXIT_SUCCESS);
         } else {
             throw Terminate();
         }
 
-        passwdEnt = getpwuid(getuid());
-        if (passwdEnt == nullptr) throw ErrnoFatal("getpwduid");
 
-        string runtimePath = string(passwdEnt->pw_dir);
-        string historyPath = runtimePath + "/.bash_history";
-
+        string runtimePath;
         const char *runtimePathPtr = std::getenv("XDG_RUNTIME_DIR");
         if (runtimePathPtr) runtimePath = runtimePathPtr;
+        else runtimePath = homeDirPath;
 
         return client(argc, argv, runtimePath, historyPath, pid, cmd, data);
     } catch (const FatalError& exc) {
