@@ -51,7 +51,9 @@ struct Request {
     enum class Command {
         update,
         deregister,
-        shutdown
+        shutdown,
+        log_start,
+        log_stop
     };
 
     pid_t origin;
@@ -466,6 +468,21 @@ server(UnixSocket sock, ofstream&& history)
                 break;
             case Request::Command::shutdown:
                 shutdownServer = true;
+                break;
+            case Request::Command::log_start: {
+                //FIXME: Error handling
+                freopen(req->payload, "w", stderr);
+                cerr << "Logging started!" << endl;
+                cerr << "IOV_MAX: " << IOV_MAX << endl;
+                cerr << "ARG_MAX: " << ARG_MAX << endl;
+                break;
+            }
+            case Request::Command::log_stop: {
+                cerr << "Stopping logging!" << endl;
+                //FIXME: Error handling
+                freopen("/dev/null", "w", stderr);
+                break;
+            }
         }
     }
 
@@ -575,6 +592,11 @@ int main(int argc, char **argv)
         } else if (argc == 2 && !strcmp(argv[1], "history-path")) {
             cout << historyPath << endl;
             exit(EXIT_SUCCESS);
+        } else if (argc == 4 && !strcmp(argv[1], "log") && !strcmp(argv[2], "start") ) {
+            cmd = Request::Command::log_start;
+            data = argv[3];
+        } else if (argc == 3 && !strcmp(argv[1], "log") && !strcmp(argv[2], "stop") ) {
+            cmd = Request::Command::log_stop;
         } else {
             throw Terminate();
         }
