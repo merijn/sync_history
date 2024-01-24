@@ -115,9 +115,9 @@ class ErrnoFatal : public FatalError {
     const int error;
     const string func;
 
-    ErrnoFatal(const string &msg, const string &extra = "")
-     : FatalError(msg + "(): " + string(strerror(errno)) + from_extra(extra))
-     , error(errno), func(msg)
+    ErrnoFatal(const string &function, const string &extra = "")
+     : FatalError(function + "(): " + string(strerror(errno)) + from_extra(extra))
+     , error(errno), func(function)
     {}
 
     ErrnoFatal(const ErrnoFatal& exc)
