@@ -16,7 +16,7 @@ jobs:
           - os: ubuntu-latest
             url_dir: linux64
           - os: macos-latest
-            url_dir: macOSX
+            url_dir: macOS
 
     steps:
       - uses: actions/checkout@v2
@@ -31,7 +31,7 @@ jobs:
       - name: Download Coverity Build Tool
         if: steps.cache-cov.outputs.cache-hit != 'true'
         run: |
-          wget https://scan.coverity.com/download/${{ matrix.url_dir }} --post-data "token=$TOKEN&project=merijn%2Fsync_history" -O coverity_tool.tgz
+          wget https://scan.coverity.com/download/cxx/${{ matrix.url_dir }} --post-data "token=$TOKEN&project=merijn%2Fsync_history" -O coverity_tool.tgz
           mkdir coverity_tool
           tar xzf coverity_tool.tgz --strip 1 -C coverity_tool
         env:
