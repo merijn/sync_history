@@ -15,8 +15,6 @@ jobs:
         include:
           - os: ubuntu-latest
             url_dir: linux64
-          - os: macos-latest
-            url_dir: macOS
 
     steps:
       - uses: actions/checkout@v2
