@@ -1,5 +1,7 @@
 .DELETE_ON_ERROR:
 
+-include $(patsubst %.cpp, .build/%.d, $(wildcard *.cpp))
+
 V = 0
 AT_0 := @
 AT_1 :=
@@ -24,11 +26,14 @@ endif
 LDFLAGS=-ldl -g
 LD=$(CXX)
 
-sync_history: sync_history.o
+sync_history: .build/sync_history.o
 	$(PRINTF) " LD\t$@\n"
 	$(AT)$(LD) $(LDFLAGS) $^ -o $@
 
-%.o: %.cpp
+.build/:
+	$(AT)mkdir -p "$@"
+
+.build/%.o: %.cpp | .build/
 	$(PRINTF) " CXX\t$*.cpp\n"
 	$(AT)$(CXX) $(CXXFLAGS) -I. $< -c -o $@
 
