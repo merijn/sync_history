@@ -16,9 +16,6 @@
 #include "util.hpp"
 #include "history_cache.hpp"
 
-using std::string;
-using std::runtime_error;
-
 struct Request {
     enum class Command {
         update,
@@ -78,7 +75,7 @@ class UnixSocket {
     struct sockaddr_un from;
 
     static sockaddr_un
-    addr_from_path(const string& path)
+    addr_from_path(const std::string& path)
     {
         size_t ret;
         struct sockaddr_un addr;
@@ -108,7 +105,7 @@ class UnixSocket {
         }
     }
 
-    UnixSocket(const string& path)
+    UnixSocket(const std::string& path)
      : UnixSocket(addr_from_path(path))
     {}
 
@@ -168,7 +165,7 @@ class UnixSocket {
     }
 
     template<typename T>
-    void send(T& msg, void *data, const string& path)
+    void send(T& msg, void *data, const std::string& path)
     { send(msg, data, addr_from_path(path)); }
 
     template<typename T>
