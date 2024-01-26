@@ -13,34 +13,9 @@
 #include <unordered_map>
 
 #include "limits.hpp"
+#include "commands.hpp"
 #include "util.hpp"
 #include "history_cache.hpp"
-
-struct Request {
-    enum class Command {
-        update,
-        deregister,
-        shutdown,
-        log_start,
-        log_stop
-    };
-
-    pid_t origin;
-    Command cmd;
-    size_t length;
-    char payload[];
-};
-
-struct Reply {
-    enum class Command {
-        new_hist,
-        reload_file
-    };
-
-    Command cmd;
-    size_t length;
-    char payload[];
-};
 
 const size_t max_size = sizeof (Request) + max_command_size;
 
