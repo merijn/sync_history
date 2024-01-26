@@ -40,4 +40,5 @@ sync_history: .build/sync_history.o
 .PHONY: clean
 clean:
 	$(PRINTF) " cleaning\n"
-	$(AT)rm sync_history.o sync_history.d
+	$(AT)rm -r .build
+	$(AT)rm sync_history
