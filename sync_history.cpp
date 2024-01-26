@@ -110,6 +110,14 @@ class UnixSocket {
     template<typename T>
     void recv(T* buf)
     {
+        ssize_t result = recv(static_cast<void*>(buf));
+        if (static_cast<size_t>(result) != buf->length + sizeof *buf) {
+            throw FatalError("recvmsg(): Incorrect message length");
+        }
+    }
+
+    ssize_t recv(void* buf)
+    {
         ssize_t ret;
 
         struct iovec buffers[] = { { buf, max_size } };
@@ -124,12 +132,11 @@ class UnixSocket {
             };
 
         ret = recvmsg(sock, &header, 0);
-        if (ret == -1) {
-            throw ErrnoFatal("recvmsg");
-        } else if (static_cast<size_t>(ret) != buf->length + sizeof *buf) {
-            throw FatalError("recvmsg(): Incorrect message length");
-        }
+        if (ret == -1) throw ErrnoFatal("recvmsg");
+
         received = true;
+
+        return ret;
     }
 
     template<typename T>
@@ -144,20 +151,19 @@ class UnixSocket {
     { send(msg, data, addr_from_path(path)); }
 
     template<typename T>
-    void send(T& msg, void *data, sockaddr_un&& addr)
-    { send(msg, data, addr); }
+    void send(T& msg, void *data, const sockaddr_un& addr)
+    { send(&msg, sizeof msg, data, msg.length, addr); }
 
-    template<typename T>
-    void send(T& msg, void *data, sockaddr_un& addr)
+    void send(void *msg_header, size_t header_length, void *data, size_t data_length, const sockaddr_un& addr)
     {
         ssize_t ret;
         struct iovec buffers[] = {
-            { &msg, sizeof msg },
-            { data, msg.length }
+            { msg_header, header_length },
+            { data, data_length }
         };
 
         struct msghdr header =
-            { .msg_name = &addr
+            { .msg_name = const_cast<sockaddr_un*>(&addr)
             , .msg_namelen = sizeof addr
             , .msg_iov = buffers
             , .msg_iovlen = 2
@@ -169,7 +175,7 @@ class UnixSocket {
         ret = sendmsg(sock, &header, 0);
         if (ret == -1) {
             throw ErrnoFatal("sendmsg");
-        } else if (static_cast<size_t>(ret) != msg.length + sizeof msg) {
+        } else if (static_cast<size_t>(ret) != header_length + data_length) {
             throw FatalError("sendmsg(): Sent incorrect length!");
         }
         received = true;
