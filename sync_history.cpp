@@ -7,45 +7,17 @@
 #include <sys/time.h>
 #include <sys/wait.h>
 #include <sys/un.h>
-#include <unistd.h>
 
-#include <cerrno>
-#include <climits>
 #include <fstream>
 #include <iostream>
-#include <sstream>
 #include <unordered_map>
+
+#include "limits.hpp"
+#include "util.hpp"
+#include "history_cache.hpp"
 
 using std::string;
 using std::runtime_error;
-
-#if defined(__GLIBC__)
-static size_t
-strlcpy(char *dst, const char *src, size_t siz)
-{
-    char *d = dst;
-    const char *s = src;
-    size_t n = siz;
-
-    /* Copy as many bytes as will fit */
-    if (n != 0 && --n != 0) {
-        do {
-            if ((*d++ = *s++) == 0)
-                break;
-        } while (--n != 0);
-    }
-
-    /* Not enough room in dst, add NUL and traverse rest of src */
-    if (n == 0) {
-        if (siz != 0)
-            *d = '\0';          /* NUL-terminate dst */
-        while (*s++)
-            ;
-    }
-
-    return static_cast<size_t>(s - src - 1);   /* count does not include NUL */
-}
-#endif
 
 struct Request {
     enum class Command {
@@ -73,63 +45,9 @@ struct Reply {
     char payload[];
 };
 
-const size_t max_size = sizeof (Request) + ARG_MAX;
+const size_t max_size = sizeof (Request) + max_command_size;
 
 static char messageBuffer[max_size];
-
-class Terminate {
-  public:
-    const int status;
-
-    Terminate(int s = EXIT_FAILURE) : status(s)
-    {}
-
-    Terminate(const Terminate& exc) : status(exc.status)
-    {}
-
-    ~Terminate();
-};
-
-Terminate::~Terminate() {}
-
-/* Handle premature exit and grabbing errno code */
-class FatalError : public runtime_error {
-  public:
-    FatalError(const string &msg) : runtime_error(msg)
-    {}
-
-    FatalError(const FatalError& exc) : runtime_error(exc.what())
-    {}
-
-    ~FatalError() override;
-};
-
-FatalError::~FatalError() {}
-
-class ErrnoFatal : public FatalError {
-    string from_extra(const string& msg)
-    {
-        if (msg.empty()) return "";
-        return ": " + msg;
-    }
-
-  public:
-    const int error;
-    const string func;
-
-    ErrnoFatal(const string &function, const string &extra = "")
-     : FatalError(function + "(): " + string(strerror(errno)) + from_extra(extra))
-     , error(errno), func(function)
-    {}
-
-    ErrnoFatal(const ErrnoFatal& exc)
-     : FatalError(exc.what()), error(exc.error), func(exc.func)
-    {}
-
-    ~ErrnoFatal() override;
-};
-
-ErrnoFatal::~ErrnoFatal() {}
 
 static void
 closeFd(int fd)
@@ -151,53 +69,6 @@ setProcName(int argc, char *argv[], const char *name)
     memset(&argv[0][len], '\0', argvSize - len);
 }
 
-struct membuf : public std::streambuf {
-    using seekdir = std::ios_base::seekdir;
-    using openmode = std::ios_base::openmode;
-    using ios_base = std::ios_base;
-
-    template <size_t Size>
-    membuf(char (&array)[Size])
-    {
-        setp(array, array + Size - 2);
-        std::fill_n(array, Size, 0);
-    }
-
-  protected:
-    std::streamsize
-    xsputn(const char_type* s, std::streamsize count) override
-    {
-        std::streamsize result = std::streambuf::xsputn(s, count);
-        /* Always legal, because epptr points before in due to constructor */
-        *pptr() = '\0';
-        return result;
-    }
-
-    pos_type seekpos(pos_type pos, openmode which = ios_base::out) override
-    { return seekoff(pos, ios_base::beg, which); }
-
-    pos_type
-    seekoff(off_type off, seekdir dir, openmode which = ios_base::out) override
-    {
-        if ((which & ios_base::out) != ios_base::out) {
-            return pos_type(off_type(-1));
-        }
-
-        off_type current = pptr() - pbase();
-        off_type max = epptr() - pbase();
-
-        if (dir == ios_base::end) off = max - off;
-        else if (dir == ios_base::cur) off = current + off;
-
-        if (off < 0 || off > max) return pos_type(off_type(-1));
-        pbump(static_cast<int>(off - current));
-        return pptr() - pbase();
-    }
-
-    ~membuf() override;
-};
-
-membuf::~membuf() {}
 
 class UnixSocket {
     bool initialised;
@@ -335,36 +206,6 @@ class UnixSocket {
 
 using namespace std;
 
-class HistCache : virtual membuf, public ostream {
-    bool fresh;
-    char array[max_size];
-
-  public:
-    HistCache() : membuf(array), ostream(this), fresh(true) {}
-    ~HistCache() override;
-
-    operator void*()
-    { return array; }
-
-    size_t length()
-    { return static_cast<size_t>(tellp()); }
-
-    bool is_new()
-    {
-        bool result = fresh;
-        fresh = false;
-        return result;
-    }
-
-    bool should_reload()
-    { return eof() || fail(); }
-
-    void reset()
-    { clear(); seekp(0); }
-};
-
-HistCache::~HistCache() {}
-
 static bool shutdownServer = false;
 
 // Signals to replace with graceful shutdown
@@ -391,7 +232,7 @@ static void __attribute__((noreturn))
 server(UnixSocket sock, ofstream&& history)
 {
     int result;
-    unordered_map<pid_t,HistCache> caches;
+    unordered_map<pid_t,HistoryCache> caches;
 
     Reply rep;
     Request *req = reinterpret_cast<Request*>(messageBuffer);

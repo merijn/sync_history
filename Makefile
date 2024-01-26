@@ -26,7 +26,7 @@ endif
 LDFLAGS=-ldl -g
 LD=$(CXX)
 
-sync_history: .build/sync_history.o
+sync_history: .build/sync_history.o .build/util.o .build/history_cache.o
 	$(PRINTF) " LD\t$@\n"
 	$(AT)$(LD) $(LDFLAGS) $^ -o $@
 
