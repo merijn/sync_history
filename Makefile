@@ -1,7 +1,5 @@
 .DELETE_ON_ERROR:
 
--include $(patsubst %.cpp, .build/%.d, $(wildcard *.cpp))
-
 V = 0
 AT_0 := @
 AT_1 :=
@@ -42,3 +40,5 @@ clean:
 	$(PRINTF) " cleaning\n"
 	$(AT)rm -r .build
 	$(AT)rm sync_history
+
+-include $(patsubst %.cpp, .build/%.d, $(wildcard *.cpp))
