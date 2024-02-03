@@ -3,10 +3,7 @@
 #ifdef __linux__
 #include <linux/limits.h>
 #endif
-#include <sys/socket.h>
 #include <sys/time.h>
-#include <sys/wait.h>
-#include <sys/un.h>
 
 #include <fstream>
 #include <iostream>
@@ -16,18 +13,7 @@
 #include "commands.hpp"
 #include "util.hpp"
 #include "history_cache.hpp"
-
-const size_t max_size = sizeof (Request) + max_command_size;
-
-static char messageBuffer[max_size];
-
-static void
-closeFd(int fd)
-{
-    if (close(fd) == -1) {
-        //FIXME: log error
-    }
-}
+#include "unix_socket.hpp"
 
 static void
 setProcName(int argc, char *argv[], const char *name)
@@ -40,152 +26,6 @@ setProcName(int argc, char *argv[], const char *name)
     }
     memset(&argv[0][len], '\0', argvSize - len);
 }
-
-
-class UnixSocket {
-    bool initialised;
-    bool received;
-    int sock;
-    struct sockaddr_un origin;
-    struct sockaddr_un from;
-
-    static sockaddr_un
-    addr_from_path(const std::string& path)
-    {
-        size_t ret;
-        struct sockaddr_un addr;
-        addr.sun_family = AF_UNIX;
-        ret = strlcpy(addr.sun_path, path.c_str(), sizeof addr.sun_path);
-        if (ret >= sizeof addr.sun_path) {
-            throw FatalError("Socket path to long");
-        }
-#ifdef __APPLE__
-        addr.sun_len = static_cast<unsigned char>(ret);
-#endif
-        return addr;
-    }
-
-  public:
-    UnixSocket(const sockaddr_un& addr)
-     : initialised(true), received(false), origin(addr)
-    {
-        int ret;
-        sock = socket(AF_UNIX, SOCK_DGRAM, 0);
-        if (sock == -1) throw ErrnoFatal("socket");
-
-        ret = bind(sock, reinterpret_cast<const sockaddr*>(&addr), sizeof addr);
-        if (ret == -1) {
-            closeFd(sock);
-            throw ErrnoFatal("bind", addr.sun_path);
-        }
-    }
-
-    UnixSocket(const std::string& path)
-     : UnixSocket(addr_from_path(path))
-    {}
-
-    UnixSocket(UnixSocket&& s)
-     : initialised(s.initialised), received(s.received), sock(s.sock)
-     , origin(s.origin), from(s.from)
-    { s.initialised = false; }
-
-    ~UnixSocket()
-    { close(true); }
-
-    void close(bool do_unlink = false)
-    {
-        int ret;
-        if (initialised) {
-            closeFd(sock);
-            if (do_unlink) {
-                ret = unlink(origin.sun_path);
-                if (ret == -1) {
-                    //FIXME: log error
-                }
-            }
-            initialised = false;
-        }
-    }
-
-    template<typename T>
-    T* recv()
-    {
-        T* buf = nullptr;
-        ssize_t size = recv(reinterpret_cast<void**>(&buf));
-        if (static_cast<size_t>(size) != buf->length + sizeof *buf) {
-            throw FatalError("recvmsg(): Incorrect message length");
-        }
-
-        return buf;
-    }
-
-    ssize_t recv(void **resultPtr)
-    {
-        ssize_t ret;
-
-        struct iovec buffers[] = { { messageBuffer, max_size } };
-        struct msghdr header =
-            { .msg_name = &from
-            , .msg_namelen = sizeof from
-            , .msg_iov = buffers
-            , .msg_iovlen = 1
-            , .msg_control = nullptr
-            , .msg_controllen = 0
-            , .msg_flags = 0
-            };
-
-        ret = recvmsg(sock, &header, 0);
-        if (ret == -1) throw ErrnoFatal("recvmsg");
-
-        received = true;
-
-        *resultPtr = reinterpret_cast<void*>(&messageBuffer);
-
-        return ret;
-    }
-
-    template<typename T>
-    void send(T& msg, void *data)
-    {
-        if (received) send(msg, data, from);
-        else throw FatalError("Can't reply without receiving first!");
-    }
-
-    template<typename T>
-    void send(T& msg, void *data, const std::string& path)
-    { send(msg, data, addr_from_path(path)); }
-
-    template<typename T>
-    void send(T& msg, void *data, const sockaddr_un& addr)
-    { send(&msg, sizeof msg, data, msg.length, addr); }
-
-    void send(void *msg_header, size_t header_length, void *data, size_t data_length, const sockaddr_un& addr)
-    {
-        ssize_t ret;
-        struct iovec buffers[] = {
-            { msg_header, header_length },
-            { data, data_length }
-        };
-
-        struct msghdr header =
-            { .msg_name = const_cast<sockaddr_un*>(&addr)
-            , .msg_namelen = sizeof addr
-            , .msg_iov = buffers
-            , .msg_iovlen = 2
-            , .msg_control = nullptr
-            , .msg_controllen = 0
-            , .msg_flags = 0
-            };
-
-        ret = sendmsg(sock, &header, 0);
-        if (ret == -1) {
-            throw ErrnoFatal("sendmsg");
-        } else if (static_cast<size_t>(ret) != header_length + data_length) {
-            throw FatalError("sendmsg(): Sent incorrect length!");
-        }
-        received = true;
-    }
-};
 
 using namespace std;
 
@@ -218,7 +58,7 @@ server(UnixSocket sock, ofstream&& history)
     unordered_map<pid_t,HistoryCache> caches;
 
     Reply rep;
-    Request *req = reinterpret_cast<Request*>(messageBuffer);
+    Request *req = nullptr;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -351,7 +191,7 @@ client
     ssize_t ret;
     UnixSocket sock(runtimePath + "/.sync-" + to_string(pid));
     string sockPath(runtimePath + "/.sync_history");
-    Reply *rep = reinterpret_cast<Reply*>(messageBuffer);
+    Reply *rep = nullptr;
     Request req { pid , cmd , data ? strlen(data) + 1 : 0};
 
     try {
