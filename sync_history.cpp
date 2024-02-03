@@ -108,19 +108,22 @@ class UnixSocket {
     }
 
     template<typename T>
-    void recv(T* buf)
+    T* recv()
     {
-        ssize_t result = recv(static_cast<void*>(buf));
-        if (static_cast<size_t>(result) != buf->length + sizeof *buf) {
+        T* buf = nullptr;
+        ssize_t size = recv(reinterpret_cast<void**>(&buf));
+        if (static_cast<size_t>(size) != buf->length + sizeof *buf) {
             throw FatalError("recvmsg(): Incorrect message length");
         }
+
+        return buf;
     }
 
-    ssize_t recv(void* buf)
+    ssize_t recv(void **resultPtr)
     {
         ssize_t ret;
 
-        struct iovec buffers[] = { { buf, max_size } };
+        struct iovec buffers[] = { { messageBuffer, max_size } };
         struct msghdr header =
             { .msg_name = &from
             , .msg_namelen = sizeof from
@@ -135,6 +138,8 @@ class UnixSocket {
         if (ret == -1) throw ErrnoFatal("recvmsg");
 
         received = true;
+
+        *resultPtr = reinterpret_cast<void*>(&messageBuffer);
 
         return ret;
     }
@@ -234,7 +239,7 @@ server(UnixSocket sock, ofstream&& history)
 
     while (!shutdownServer) {
         /* receive command from new connection */
-        sock.recv(req);
+        req = sock.recv<Request>();
 
         switch (req->cmd) {
             /* Handle update */
@@ -366,7 +371,7 @@ client
     /* Only wait for reply when updating */
     if (cmd != Request::Command::update) return 0;
 
-    sock.recv(rep);
+    rep = sock.recv<Reply>();
     switch (rep->cmd) {
         case Reply::Command::new_hist:
             if (rep->length) {
