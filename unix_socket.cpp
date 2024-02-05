@@ -74,6 +74,14 @@ UnixSocket::close(bool do_unlink)
     }
 }
 
+Reply*
+UnixSocket::recvReply()
+{ return recv<Reply>(); }
+
+Request*
+UnixSocket::recvRequest()
+{ return recv<Request>(); }
+
 ssize_t
 UnixSocket::recv(void **resultPtr)
 {

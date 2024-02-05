@@ -79,7 +79,7 @@ server(UnixSocket sock, ofstream&& history)
 
     while (!shutdownServer) {
         /* receive command from new connection */
-        req = sock.recv<Request>();
+        req = sock.recvRequest();
 
         switch (req->cmd) {
             /* Handle update */
@@ -211,7 +211,7 @@ client
     /* Only wait for reply when updating */
     if (cmd != Request::Command::update) return 0;
 
-    rep = sock.recv<Reply>();
+    rep = sock.recvReply();
     switch (rep->cmd) {
         case Reply::Command::new_hist:
             if (rep->length) {
