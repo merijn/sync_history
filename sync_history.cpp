@@ -54,7 +54,7 @@ handleSignal(int)
 static void __attribute__((noreturn))
 server(UnixSocket sock, ofstream&& history)
 {
-    using Cache = HistoryCache<max_command_size>;
+    using Cache = HistoryCache<max_buffer_size>;
 
     int result;
     unordered_map<pid_t,Cache> caches;
