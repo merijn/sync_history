@@ -54,8 +54,10 @@ handleSignal(int)
 static void __attribute__((noreturn))
 server(UnixSocket sock, ofstream&& history)
 {
+    using Cache = HistoryCache<max_command_size>;
+
     int result;
-    unordered_map<pid_t,HistoryCache> caches;
+    unordered_map<pid_t,Cache> caches;
 
     Reply rep;
     Request *req = nullptr;

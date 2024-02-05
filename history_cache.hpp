@@ -3,8 +3,6 @@
 
 #include <sstream>
 
-#include "limits.hpp"
-
 struct membuf : public std::streambuf {
     using seekdir = std::ios_base::seekdir;
     using openmode = std::ios_base::openmode;
@@ -29,13 +27,17 @@ struct membuf : public std::streambuf {
     ~membuf() override;
 };
 
+template<size_t MAX>
 class HistoryCache : virtual membuf, public std::ostream {
     bool fresh;
-    char array[max_command_size];
+    char array[MAX];
 
   public:
-    HistoryCache() : membuf(array), std::ostream(this), fresh(true) {}
-    ~HistoryCache() override;
+    HistoryCache() : membuf(array), std::ostream(this), fresh(true)
+    {}
+
+    ~HistoryCache() override
+    {}
 
     operator void*()
     { return array; }

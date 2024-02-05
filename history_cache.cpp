@@ -32,5 +32,3 @@ membuf::seekoff(off_type off, seekdir dir, openmode which)
 }
 
 membuf::~membuf() {}
-
-HistoryCache::~HistoryCache() {}
